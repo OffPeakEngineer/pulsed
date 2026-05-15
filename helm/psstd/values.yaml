@@ -1,0 +1,27 @@
+image:
+  repository: ghcr.io/yourname/psstd
+  tag: latest
+  pullPolicy: IfNotPresent
+
+web:
+  enabled: true
+  port: 8080
+
+gossip:
+  port: 7946
+
+db:
+  path: /var/lib/psstd/state
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 20m
+    memory: 32Mi
+
+tolerations:
+  - operator: Exists  # run on ALL nodes including control-plane
+
+nodeSelector: {}

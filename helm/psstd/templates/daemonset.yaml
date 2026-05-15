@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "psstd.fullname" . }}
+  labels: {{ include "psstd.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{ include "psstd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{ include "psstd.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "psstd.fullname" . }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: psstd
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PSSTD_DB
+              value: {{ .Values.db.path }}
+            - name: PSSTD_HTTP
+              value: ":{{ .Values.web.port }}"
+            - name: PSSTD_GOSSIP
+              value: ":{{ .Values.gossip.port }}"
+            - name: PSSTD_WEB
+              value: "{{ .Values.web.enabled }}"
+            - name: PSSTD_SEEDS
+              value: "psstd-headless.{{ .Release.Namespace }}.svc.cluster.local"
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+            - name: gossip-tcp
+              containerPort: {{ .Values.gossip.port }}
+              protocol: TCP
+            - name: gossip-udp
+              containerPort: {{ .Values.gossip.port }}
+              protocol: UDP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/psstd
+      volumes:
+        - name: state
+          emptyDir: {}

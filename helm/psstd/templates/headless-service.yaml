@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: psstd-headless
+spec:
+  clusterIP: None
+  selector: {{ include "psstd.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: gossip-tcp
+      port: {{ .Values.gossip.port }}
+      protocol: TCP
+    - name: gossip-udp
+      port: {{ .Values.gossip.port }}
+      protocol: UDP

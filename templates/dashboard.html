@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>psstd</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d0d0d;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 6px;
+  min-height: 100vh;
+}
+.cell {
+  font-family: 'Courier New', Courier, monospace;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: {{printf "%.3f" .Layout.FontSize}}vw;
+  width: calc({{printf "%.3f" .Layout.CellWidth}}vw - 8px);
+  overflow: hidden;
+}
+.cell.offline { opacity: 0.35; border-color: #550000; }
+pre { line-height: 1.3; white-space: pre; }
+/* auto-refresh every 3s — no JS framework needed */
+</style>
+<script>
+  // Pass window dimensions on first load for server-side layout math,
+  // then auto-refresh to keep stats live.
+  (function() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has('w')) {
+      p.set('w', window.innerWidth);
+      p.set('h', window.innerHeight);
+      location.replace('?' + p.toString());
+    }
+    setTimeout(() => location.reload(), 3000);
+  })();
+</script>
+</head>
+<body>
+{{range .Nodes}}
+<div class="cell{{if .Offline}} offline{{end}}">
+<pre>{{.HTML}}</pre>
+</div>
+{{end}}
+</body>
+</html>
