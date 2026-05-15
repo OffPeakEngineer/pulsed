@@ -18,6 +18,13 @@ The result is intentionally simple: every node can serve the UI, every node shar
 ## Quick Start
 
 ```bash
+go install github.com/OffPeakEngineer/psstd@latest
+psstd
+```
+
+Or build from a checkout:
+
+```bash
 go build ./
 ./psstd
 ```
@@ -61,7 +68,8 @@ Templates live in `deploy/` for common ways to keep psstd running:
 | macOS launchd | `deploy/launchd/com.offpeakengineer.psstd.plist` |
 | Windows service | `deploy/windows/install-service.ps1` using NSSM |
 | Kubernetes | `deploy/kubernetes/psstd.yaml` |
-| Ansible | `deploy/ansible/install-psstd.yml` |
+| Ansible local binary | `deploy/ansible/install-psstd.yml` |
+| Ansible release binary | `deploy/ansible/install-release-psstd.yml` |
 | Traefik to bare metal | `deploy/traefik/bare-metal-node.yaml` |
 | Traefik single hostname | `deploy/traefik/single-host-query.yaml` |
 
@@ -73,6 +81,8 @@ sudo sh deploy/systemd/install.sh
 sudoedit /etc/psstd/psstd.env
 sudo systemctl restart psstd
 ```
+
+For clusters, build or download the binary once, then distribute that binary with systemd or Ansible. Avoid `go install` on every host unless you intentionally manage Go toolchains there.
 
 macOS launchd:
 
@@ -145,4 +155,8 @@ psstd uses peer-to-peer state sharing and a small local store internally, but th
 
 ## Requirements
 
-- Go 1.20+
+- Go 1.25+ if building from source with `go install` or `go build`.
+
+For fleet installs, prefer release binaries or a binary built once in CI over compiling on every host. This avoids distro Go version drift and keeps bare-metal installs simple.
+
+CI runs on GitHub-hosted Linux, Windows, and macOS runners for both x64 and arm64 where standard hosted runners are available. Releases publish matching Linux, macOS, and Windows binaries from `deploy/release/build-all.sh`.

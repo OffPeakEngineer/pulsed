@@ -1,4 +1,4 @@
-module github.com/yourname/psstd
+module github.com/OffPeakEngineer/psstd
 
 go 1.25.0
 

@@ -1,34 +1,69 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  push:
+    branches:
+      - main
 
 jobs:
   commitlint:
-    runs-on: ubuntu-latest
+    name: commitlint
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - run: npm install
-      - run: |
+          node-version: 22
+
+      - name: Install commit tooling
+        run: npm install
+
+      - name: Lint commits
+        shell: bash
+        run: |
           git fetch --no-tags --prune --unshallow || true
           base=$(git merge-base origin/main HEAD || echo HEAD~20)
           npx commitlint --from="$base" --to=HEAD
 
-  build:
+  test:
+    name: test (${{ matrix.name }})
     needs: commitlint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-amd64
+            runner: ubuntu-24.04
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+          - name: windows-amd64
+            runner: windows-2025
+          - name: windows-arm64
+            runner: windows-11-arm
+          - name: darwin-amd64
+            runner: macos-15-intel
+          - name: darwin-arm64
+            runner: macos-15
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - run: go test ./...
-      - run: go build ./...
+          go-version: '1.25.x'
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build ./...

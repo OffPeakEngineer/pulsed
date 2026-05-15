@@ -33,4 +33,5 @@ go.work.sum
 
 # psstd and it's default data dir
 psstd
+dist/
 data/
