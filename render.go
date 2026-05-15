@@ -265,14 +265,23 @@ func pageURL(base string, values url.Values) string {
 	if base == "" {
 		base = "/"
 	}
-	if values == nil {
-		return base
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "/"
 	}
-	encoded := values.Encode()
+	query := parsed.Query()
+	for key, vals := range values {
+		query.Del(key)
+		for _, value := range vals {
+			query.Add(key, value)
+		}
+	}
+	encoded := query.Encode()
+	parsed.RawQuery = encoded
 	if encoded == "" {
-		return base
+		return parsed.String()
 	}
-	return base + "?" + encoded
+	return parsed.String()
 }
 
 func normalizePageBase(base string) string {
@@ -283,7 +292,6 @@ func normalizePageBase(base string) string {
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 		return "/"
 	}
-	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	if parsed.Path == "" {
 		parsed.Path = "/"

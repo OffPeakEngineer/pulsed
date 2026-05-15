@@ -62,6 +62,8 @@ Templates live in `deploy/` for common ways to keep psstd running:
 | Windows service | `deploy/windows/install-service.ps1` using NSSM |
 | Kubernetes | `deploy/kubernetes/psstd.yaml` |
 | Ansible | `deploy/ansible/install-psstd.yml` |
+| Traefik to bare metal | `deploy/traefik/bare-metal-node.yaml` |
+| Traefik single hostname | `deploy/traefik/single-host-query.yaml` |
 
 Linux systemd quick install from a built binary:
 
@@ -92,6 +94,44 @@ Kubernetes:
 ```bash
 kubectl apply -f deploy/kubernetes/psstd.yaml
 ```
+
+### Reverse Proxies
+
+Hot-potato refreshes and peer links require node identity to survive the browser round trip. If a single URL like `https://psstd.example.com` is backed by a normal load balancer, the next request may land on any node, so the browser has not really rebased to the lower-load peer.
+
+Use one browser-routable URL per node instead:
+
+```text
+https://psstd-node-a.example.com -> 10.0.1.25:8080
+https://psstd-node-b.example.com -> 10.0.1.26:8080
+https://psstd-node-c.example.com -> 10.0.1.27:8080
+```
+
+Then set each node's advertised URL to its proxied hostname:
+
+```bash
+PSSTD_HTTP=:8080
+PSSTD_ADVERTISE_HTTP=https://psstd-node-a.example.com
+PSSTD_GOSSIP=:7946
+PSSTD_SEEDS=10.0.1.26:7946,10.0.1.27:7946
+```
+
+With Traefik in Kubernetes proxying bare-metal nodes, create one Service, Endpoints, and IngressRoute per node. Start from `deploy/traefik/bare-metal-node.yaml`.
+
+If you prefer one hostname, route by query parameter instead:
+
+```text
+https://psstd.example.com/?psstd_node=node-a -> 10.0.1.25:8080
+https://psstd.example.com/?psstd_node=node-b -> 10.0.1.26:8080
+```
+
+Then advertise the routed URL from each node:
+
+```bash
+PSSTD_ADVERTISE_HTTP=https://psstd.example.com/?psstd_node=node-a
+```
+
+Traefik supports query-param matchers in router rules, so this keeps link clicks and hot-potato refreshes on a single DNS name while still selecting a specific backend. Start from `deploy/traefik/single-host-query.yaml`.
 
 ## Health Check
 
