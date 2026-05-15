@@ -35,6 +35,8 @@ jobs:
     name: test (${{ matrix.name }})
     needs: commitlint
     runs-on: ${{ matrix.runner }}
+    env:
+      CGO_ENABLED: "0"
     strategy:
       fail-fast: false
       matrix:
