@@ -238,7 +238,8 @@ button:focus, select:focus, .link-button:focus {
 .cell-header {
   margin-bottom: 8px;
 }
-.cell-header a {
+.cell-header a,
+.cell-header .node-name {
   color: var(--accent);
   text-decoration: none;
   font-weight: 700;
@@ -335,7 +336,7 @@ pre { line-height: 1.4; white-space: pre; color: var(--text); }
 </div>
 {{range .Nodes}}
 <div class="cell{{if .Offline}} offline{{end}}">
-  <div class="cell-header"><a href="{{.URL}}">{{.Name}}</a></div>
+  <div class="cell-header">{{if .Link}}<a href="{{.URL}}">{{.Name}}</a>{{else}}<span class="node-name">{{.Name}}</span>{{end}}</div>
   <pre>{{.HTML}}</pre>
 </div>
 {{end}}

@@ -364,6 +364,7 @@ type cellData struct {
 	URL     string
 	HTML    template.HTML
 	Offline bool
+	Link    bool
 }
 
 type pageData struct {
@@ -392,12 +393,17 @@ func makeHandler(db *pebble.DB, selfName string) http.HandlerFunc {
 		for _, s := range nodes {
 			htmlBytes := ansihtml.ConvertToHTML([]byte(renderANSI(s)))
 			offline := s.UpdatedAt == 0 || time.Since(time.Unix(0, s.UpdatedAt)) > 15*time.Second
+			nodeURL := ""
+			if s.WebURL != "" {
+				nodeURL = pageURL(s.WebURL, displayQuery(r, winW, winH))
+			}
 
 			cells = append(cells, cellData{
 				Name:    s.Name,
-				URL:     pageURL(s.WebURL, displayQuery(r, winW, winH)),
+				URL:     nodeURL,
 				HTML:    template.HTML(htmlBytes),
 				Offline: offline,
+				Link:    nodeURL != "",
 			})
 		}
 

@@ -9,6 +9,8 @@
 #
 # Traefik routes by query parameter before forwarding the request, so hot-potato
 # refreshes and peer links still land on the intended node without per-node DNS.
+# Requests without a matching psstd_node value fall back to psstd-any. Keep that
+# Endpoints list limited to nodes that should receive unrouted fallback traffic.
 apiVersion: v1
 kind: Service
 metadata:
@@ -55,6 +57,30 @@ subsets:
       - name: http
         port: 8080
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: psstd-any
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: psstd-any
+  namespace: default
+subsets:
+  - addresses:
+      - ip: 10.0.1.25
+      - ip: 10.0.1.26
+    ports:
+      - name: http
+        port: 8080
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -80,6 +106,6 @@ spec:
       kind: Rule
       priority: 1
       services:
-        - name: psstd-node-a
+        - name: psstd-any
           port: 8080
   tls: {}
