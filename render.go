@@ -36,7 +36,7 @@ func init() {
 
 // ── Stats collection ──────────────────────────────────────────────────────────
 
-func collectStats(hostname, webURL, version string) (NodeStats, error) {
+func collectStats(hostname, webURL, version string, ttl time.Duration) (NodeStats, error) {
 	cpuPcts, err := cpu.Percent(200*time.Millisecond, true)
 	if err != nil {
 		return NodeStats{}, err
@@ -53,7 +53,7 @@ func collectStats(hostname, webURL, version string) (NodeStats, error) {
 		Name:       hostname,
 		Version:    version,
 		WebURL:     webURL,
-		TTLSeconds: int(defaultNodeTTL / time.Second),
+		TTLSeconds: int(ttl / time.Second),
 		CPU:        cpuPcts,
 		MemUsed:    vmStat.Used,
 		MemTotal:   vmStat.Total,
@@ -260,6 +260,16 @@ func avgCPU(s NodeStats) float64 {
 	return sum / float64(len(s.CPU))
 }
 
+func maxCPU(s NodeStats) float64 {
+	max := 0.0
+	for _, v := range s.CPU {
+		if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
 func computeRefreshIntervalMs(nodes []NodeStats) int {
 	if len(nodes) == 0 {
 		return 3000
@@ -450,15 +460,20 @@ func displayQuery(r *http.Request, winW, winH int) url.Values {
 // ── HTTP handler ──────────────────────────────────────────────────────────────
 
 type cellData struct {
-	Name  string
-	URL   string
-	HTML  template.HTML
-	State healthState
-	CPU   float64
-	Mem   float64
-	Load  float64
-	Age   float64
-	Link  bool
+	Name     string
+	URL      string
+	HTML     template.HTML
+	State    healthState
+	CPUAvg   float64
+	CPUMax   float64
+	MemPct   float64
+	MemUsed  uint64
+	MemTotal uint64
+	Load1    float64
+	Load5    float64
+	Load15   float64
+	Age      float64
+	Link     bool
 }
 
 type pageData struct {
@@ -498,15 +513,20 @@ func makeHandler(db *pebble.DB, selfName string) http.HandlerFunc {
 			}
 
 			cells = append(cells, cellData{
-				Name:  s.Name,
-				URL:   nodeURL,
-				HTML:  template.HTML(htmlBytes),
-				State: health.State,
-				CPU:   avgCPU(s),
-				Mem:   memPct,
-				Load:  s.Load[0],
-				Age:   health.Age.Seconds(),
-				Link:  nodeURL != "",
+				Name:     s.Name,
+				URL:      nodeURL,
+				HTML:     template.HTML(htmlBytes),
+				State:    health.State,
+				CPUAvg:   avgCPU(s),
+				CPUMax:   maxCPU(s),
+				MemPct:   memPct,
+				MemUsed:  s.MemUsed,
+				MemTotal: s.MemTotal,
+				Load1:    s.Load[0],
+				Load5:    s.Load[1],
+				Load15:   s.Load[2],
+				Age:      health.Age.Seconds(),
+				Link:     nodeURL != "",
 			})
 		}
 

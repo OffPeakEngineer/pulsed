@@ -27,3 +27,6 @@ Large clusters benefit from sorting by CPU% or memory to spot hot nodes quickly.
 - Added browser-persisted stale/offline filters
 - Kept the implementation in the dashboard template without adding server API surface
 
+## Forked follow-up
+
+- `task-20260518-dashboard-metric-sort-completeness`: finish or explicitly define the full set of populated metrics that should be sortable

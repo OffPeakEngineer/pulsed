@@ -49,6 +49,7 @@ export PSSTD_SEEDS="10.0.1.20:7946,10.0.1.21:7946" # explicit peer sync addresse
 export PSSTD_DB="./data"                          # local state directory
 export PSSTD_WEB="true"                           # set false for sync-only nodes
 export PSSTD_NODE_NAME="rack-a-01"                # optional stable node identity override
+export PSSTD_NODE_TTL="15s"                       # how long this node's heartbeat stays online
 ./psstd
 ```
 
@@ -56,6 +57,10 @@ By default, psstd uses the OS hostname as the node identity. Set
 `PSSTD_NODE_NAME` for cloned hosts, containers, or multiple test instances that
 would otherwise publish the same hostname. The override must be non-empty and
 must not contain whitespace.
+
+Each node publishes its own heartbeat TTL with `PSSTD_NODE_TTL`. Shorter values
+make stale/offline indication react faster; longer values are better for slow or
+lossy networks. The default is `15s`, and values must be at least `2s`.
 
 ## Discovery
 

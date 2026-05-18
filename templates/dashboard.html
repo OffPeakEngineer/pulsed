@@ -414,9 +414,14 @@ pre { line-height: 1.4; white-space: pre; color: var(--text); }
     <label for="sort-select">Sort</label>
     <select id="sort-select" onchange="window.psstd.applyDashboardControls()">
       <option value="name">Name</option>
-      <option value="cpu">CPU</option>
-      <option value="mem">Memory</option>
-      <option value="load">Load</option>
+      <option value="cpuAvg">CPU avg</option>
+      <option value="cpuMax">CPU max</option>
+      <option value="memPct">Memory %</option>
+      <option value="memUsed">Memory used</option>
+      <option value="memTotal">Memory total</option>
+      <option value="load1">Load 1m</option>
+      <option value="load5">Load 5m</option>
+      <option value="load15">Load 15m</option>
       <option value="age">Age</option>
     </select>
     <label><input id="hide-stale" type="checkbox" onchange="window.psstd.applyDashboardControls()"> Hide stale</label>
@@ -433,7 +438,7 @@ pre { line-height: 1.4; white-space: pre; color: var(--text); }
 </div>
 <div id="nodes" class="nodes">
 {{range .Nodes}}
-<div class="cell {{.State}}" data-name="{{.Name}}" data-state="{{.State}}" data-cpu="{{printf "%.3f" .CPU}}" data-mem="{{printf "%.3f" .Mem}}" data-load="{{printf "%.3f" .Load}}" data-age="{{printf "%.3f" .Age}}">
+<div class="cell {{.State}}" data-name="{{.Name}}" data-state="{{.State}}" data-cpu-avg="{{printf "%.3f" .CPUAvg}}" data-cpu-max="{{printf "%.3f" .CPUMax}}" data-mem-pct="{{printf "%.3f" .MemPct}}" data-mem-used="{{.MemUsed}}" data-mem-total="{{.MemTotal}}" data-load1="{{printf "%.3f" .Load1}}" data-load5="{{printf "%.3f" .Load5}}" data-load15="{{printf "%.3f" .Load15}}" data-age="{{printf "%.3f" .Age}}">
   <div class="cell-header">{{if .Link}}<a href="{{.URL}}">{{.Name}}</a>{{else}}<span class="node-name">{{.Name}}</span>{{end}}</div>
   <pre>{{.HTML}}</pre>
 </div>

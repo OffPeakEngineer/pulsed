@@ -133,9 +133,35 @@ func TestDashboardRendersClusterSummaryAndStateData(t *testing.T) {
 		`data-state="stale"`,
 		`id="sort-select"`,
 		`id="hide-offline"`,
+		`value="cpuAvg"`,
+		`value="cpuMax"`,
+		`value="memPct"`,
+		`value="memUsed"`,
+		`value="memTotal"`,
+		`value="load1"`,
+		`value="load5"`,
+		`value="load15"`,
+		`data-cpu-avg="20.000"`,
+		`data-cpu-max="20.000"`,
+		`data-mem-pct="30.000"`,
+		`data-mem-used="30"`,
+		`data-mem-total="100"`,
+		`data-load1="0.000"`,
+		`data-load5="0.000"`,
+		`data-load15="0.000"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("dashboard missing %q:\n%s", want, body)
 		}
+	}
+}
+
+func TestCollectStatsUsesConfiguredTTL(t *testing.T) {
+	stats, err := collectStats("node-a", "http://node-a:8080", "v1", 42*time.Second)
+	if err != nil {
+		t.Fatalf("collectStats: %v", err)
+	}
+	if stats.TTLSeconds != 42 {
+		t.Fatalf("ttl seconds = %d, want 42", stats.TTLSeconds)
 	}
 }

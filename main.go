@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -15,6 +16,10 @@ import (
 	"github.com/hashicorp/memberlist"
 )
 
+type cliOptions struct {
+	List bool
+}
+
 const (
 	envDB       = "PSSTD_DB"
 	envHTTP     = "PSSTD_HTTP"
@@ -23,15 +28,21 @@ const (
 	envHTTPAd   = "PSSTD_ADVERTISE_HTTP"
 	envWeb      = "PSSTD_WEB" // "true" to enable HTTP, default true
 	envNodeName = "PSSTD_NODE_NAME"
+	envNodeTTL  = "PSSTD_NODE_TTL"
 	gossipPort  = 7946
 	httpPort    = 8080
 )
 
 func main() {
+	opts := parseCLI(os.Args[1:])
 	hostname, _ := os.Hostname()
 	nodeName, err := nodeNameFromEnv(hostname)
 	if err != nil {
 		log.Fatalf("node name: %v", err)
+	}
+	nodeTTL, err := nodeTTLFromEnv()
+	if err != nil {
+		log.Fatalf("node ttl: %v", err)
 	}
 
 	dbPath := envOr(envDB, "./data")
@@ -52,7 +63,7 @@ func main() {
 	if err != nil {
 		if pebbleLockHeld(err) {
 			log.Printf("psstd already appears to own %s; starting terminal mirror instead", dbPath)
-			runTerminalMirror(nodeName, gossipAddr, seeds)
+			runTerminalMirror(nodeName, gossipAddr, seeds, opts.List)
 			return
 		}
 		log.Fatalf("pebble open: %v", err)
@@ -84,7 +95,7 @@ func main() {
 			}
 			db = nil
 			log.Printf("psstd already appears to be listening on %s; starting terminal mirror instead", gossipAddr)
-			runTerminalMirror(nodeName, gossipAddr, seeds)
+			runTerminalMirror(nodeName, gossipAddr, seeds, opts.List)
 			return
 		}
 		log.Fatalf("memberlist create: %v", err)
@@ -99,29 +110,28 @@ func main() {
 	// 2. Scan for existing peers (mDNS + any explicit seeds)
 	discovered := discoverPeers()
 	allSeeds := append(seeds, discovered...)
-	logStartupConfig(startupConfig{
-		NodeName:   nodeName,
-		DBPath:     dbPath,
-		HTTPAddr:   httpAddr,
-		WebURL:     webURL,
-		GossipAddr: gossipAddr,
-		WebEnabled: webEnabled,
-		Version:    appVersion,
-		SeedCount:  len(seeds),
-		MDNSCount:  len(discovered),
-	})
+	joinedPeers := 0
+	joinErr := error(nil)
 	if len(allSeeds) > 0 {
-		if n, err := list.Join(allSeeds); err != nil {
-			log.Printf("join warning (joined %d): %v", n, err)
-		} else {
-			log.Printf("joined cluster, %d peer(s)", n)
-		}
-	} else {
-		log.Println("no peers found — running solo, will be discovered by others")
+		joinedPeers, joinErr = list.Join(allSeeds)
 	}
+	logStartupConfig(startupConfig{
+		NodeName:    nodeName,
+		DBPath:      dbPath,
+		HTTPAddr:    httpAddr,
+		WebURL:      webURL,
+		GossipAddr:  gossipAddr,
+		WebEnabled:  webEnabled,
+		Version:     appVersion,
+		NodeTTL:     nodeTTL,
+		SeedCount:   len(seeds),
+		MDNSCount:   len(discovered),
+		JoinedPeers: joinedPeers,
+		JoinErr:     joinErr,
+	})
 
 	// ── Stats heartbeat ─────────────────────────────────────────────────────
-	go statsLoop(nodeName, webURL, appVersion, db, delegate)
+	go statsLoop(nodeName, webURL, appVersion, nodeTTL, db, delegate)
 
 	// ── HTTP ─────────────────────────────────────────────────────────────────
 	if webEnabled {
@@ -135,21 +145,44 @@ func main() {
 	}
 }
 
+func parseCLI(args []string) cliOptions {
+	fs := flag.NewFlagSet("psstd", flag.ExitOnError)
+	fs.SetOutput(os.Stderr)
+	var opts cliOptions
+	fs.BoolVar(&opts.List, "l", false, "render terminal mirror as a vertical node list")
+	fs.BoolVar(&opts.List, "list", false, "render terminal mirror as a vertical node list")
+	_ = fs.Parse(args)
+	return opts
+}
+
 type startupConfig struct {
-	NodeName   string
-	DBPath     string
-	HTTPAddr   string
-	WebURL     string
-	GossipAddr string
-	WebEnabled bool
-	Version    string
-	SeedCount  int
-	MDNSCount  int
+	NodeName    string
+	DBPath      string
+	HTTPAddr    string
+	WebURL      string
+	GossipAddr  string
+	WebEnabled  bool
+	Version     string
+	NodeTTL     time.Duration
+	SeedCount   int
+	MDNSCount   int
+	JoinedPeers int
+	JoinErr     error
 }
 
 func logStartupConfig(cfg startupConfig) {
-	log.Printf("psstd startup: version=%s node=%s db=%s web=%t http=%s advertise=%s gossip=%s seeds=%d mdns=%d",
-		cfg.Version, cfg.NodeName, cfg.DBPath, cfg.WebEnabled, cfg.HTTPAddr, cfg.WebURL, cfg.GossipAddr, cfg.SeedCount, cfg.MDNSCount)
+	log.Print(startupSummary(cfg))
+}
+
+func startupSummary(cfg startupConfig) string {
+	join := "solo"
+	if cfg.JoinErr != nil {
+		join = fmt.Sprintf("warning joined=%d error=%q", cfg.JoinedPeers, cfg.JoinErr)
+	} else if cfg.JoinedPeers > 0 {
+		join = fmt.Sprintf("joined=%d", cfg.JoinedPeers)
+	}
+	return fmt.Sprintf("psstd startup: version=%s node=%s db=%s web=%t http=%s advertise=%s gossip=%s ttl=%s seeds=%d mdns=%d join=%s",
+		cfg.Version, cfg.NodeName, cfg.DBPath, cfg.WebEnabled, cfg.HTTPAddr, cfg.WebURL, cfg.GossipAddr, cfg.NodeTTL, cfg.SeedCount, cfg.MDNSCount, join)
 }
 
 func pebbleLockHeld(err error) bool {
@@ -168,7 +201,7 @@ func addressInUse(err error) bool {
 		strings.Contains(msg, "bind: only one usage of each socket address")
 }
 
-func runTerminalMirror(hostname, gossipAddr string, seeds []string) {
+func runTerminalMirror(hostname, gossipAddr string, seeds []string, listMode bool) {
 	tmpDir, err := os.MkdirTemp("", "psstd-view-*")
 	if err != nil {
 		log.Fatalf("terminal mirror temp db: %v", err)
@@ -203,7 +236,7 @@ func runTerminalMirror(hostname, gossipAddr string, seeds []string) {
 		log.Printf("terminal mirror joined cluster, %d peer(s)", n)
 	}
 
-	terminalRenderLoop(db)
+	terminalRenderLoop(db, listMode)
 }
 
 func terminalMirrorSeeds(gossipAddr string, seeds []string) []string {
@@ -219,11 +252,11 @@ func terminalMirrorSeeds(gossipAddr string, seeds []string) []string {
 
 // ── Stats loop ───────────────────────────────────────────────────────────────
 
-func statsLoop(hostname, webURL, version string, db *pebble.DB, d *kvDelegate) {
+func statsLoop(hostname, webURL, version string, ttl time.Duration, db *pebble.DB, d *kvDelegate) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		stats, err := collectStats(hostname, webURL, version)
+		stats, err := collectStats(hostname, webURL, version, ttl)
 		if err != nil {
 			log.Printf("stats error: %v", err)
 			continue
@@ -301,6 +334,21 @@ func nodeNameFromEnv(hostname string) (string, error) {
 		return "", fmt.Errorf("%s must not contain whitespace", envNodeName)
 	}
 	return override, nil
+}
+
+func nodeTTLFromEnv() (time.Duration, error) {
+	value, ok := os.LookupEnv(envNodeTTL)
+	if !ok || value == "" {
+		return defaultNodeTTL, nil
+	}
+	ttl, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a duration such as 15s or 1m: %w", envNodeTTL, err)
+	}
+	if ttl < 2*time.Second {
+		return 0, fmt.Errorf("%s must be at least 2s", envNodeTTL)
+	}
+	return ttl, nil
 }
 
 func splitCSV(s string) []string {
